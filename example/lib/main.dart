@@ -56,15 +56,14 @@ class _DemoPageState extends State<DemoPage> {
         elevation: 0,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 5),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Default ──────────────────────────────────────────────────
-            const _SectionTitle('Default (auto-detect country)'),
+            const _SectionTitle('Default (device locale)'),
             SmartPhoneField(
               controller: _controller1,
-              autoDetectCountry: true,
               onChanged: (digits, iso) => setState(() {
                 _nationalDigits = digits;
                 _isoCode = iso;
@@ -84,7 +83,6 @@ class _DemoPageState extends State<DemoPage> {
             const _SectionTitle('Pre-selected: Bangladesh (+880)'),
             SmartPhoneField(
               initialCountryCode: 'BD',
-              autoDetectCountry: false,
               hintText: '1758 691303',
               labelText: 'Mobile Number',
               borderRadius: BorderRadius.circular(8),
@@ -98,7 +96,6 @@ class _DemoPageState extends State<DemoPage> {
             const _SectionTitle('Filled + custom colours'),
             SmartPhoneField(
               initialCountryCode: 'US',
-              autoDetectCountry: false,
               labelText: 'Phone',
               filled: true,
               fillColor: cs.primaryContainer.withValues(alpha: 0.35),
@@ -122,7 +119,6 @@ class _DemoPageState extends State<DemoPage> {
             const _SectionTitle('Read-only'),
             SmartPhoneField(
               initialCountryCode: 'GB',
-              autoDetectCountry: false,
               readOnly: true,
               borderColor: Colors.grey.shade300,
               textStyle: TextStyle(color: Colors.grey.shade500),
@@ -136,13 +132,11 @@ class _DemoPageState extends State<DemoPage> {
             const _SectionTitle('Custom error widget'),
             SmartPhoneField(
               initialCountryCode: 'DE',
-              autoDetectCountry: false,
               focusedBorderColor: Colors.purple,
               borderColor: Colors.grey.shade300,
               errorBuilder: (error) => Container(
                 margin: const EdgeInsets.only(top: 4),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.orange.shade50,
                   borderRadius: BorderRadius.circular(8),
@@ -150,14 +144,12 @@ class _DemoPageState extends State<DemoPage> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.warning_amber_rounded,
-                        size: 14, color: Colors.orange),
+                    const Icon(Icons.warning_amber_rounded, size: 14, color: Colors.orange),
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
                         error,
-                        style: const TextStyle(
-                            fontSize: 12, color: Colors.deepOrange),
+                        style: const TextStyle(fontSize: 12, color: Colors.deepOrange),
                       ),
                     ),
                   ],
@@ -210,11 +202,8 @@ class _OutputCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final country =
-        isoCode.isEmpty ? null : CountryModel.getByCode(isoCode);
-    final full = country != null && nationalDigits.isNotEmpty
-        ? '${country.dialCode}$nationalDigits'
-        : '—';
+    final country = isoCode.isEmpty ? null : CountryModel.getByCode(isoCode);
+    final full = country != null && nationalDigits.isNotEmpty ? '${country.dialCode}$nationalDigits' : '—';
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -249,11 +238,7 @@ class _Row extends StatelessWidget {
         children: [
           SizedBox(
             width: 110,
-            child: Text(label,
-                style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey,
-                    fontWeight: FontWeight.w600)),
+            child: Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w600)),
           ),
           Expanded(
             child: Text(
@@ -261,8 +246,7 @@ class _Row extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 color: isError ? Colors.red : null,
-                fontWeight:
-                    isError ? FontWeight.w500 : FontWeight.normal,
+                fontWeight: isError ? FontWeight.w500 : FontWeight.normal,
               ),
             ),
           ),

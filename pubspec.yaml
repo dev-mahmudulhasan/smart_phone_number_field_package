@@ -1,5 +1,5 @@
 name: smart_phone_field
-version: 2.0.0
+version: 2.1.2
 description: >-
   A professional Flutter phone-number input field with per-country live
   formatting, GPS-based country auto-detection, searchable country picker
@@ -16,8 +16,6 @@ dependencies:
   flutter:
     sdk: flutter
   country_picker: ^2.0.20
-  geolocator: ^10.1.0
-  geocoding: ^2.1.1
 
 dev_dependencies:
   flutter_test:

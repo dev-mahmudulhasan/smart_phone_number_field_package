@@ -9,13 +9,9 @@ export 'models/phone_format_spec.dart';
 export 'utils/phone_formatter.dart';
 
 // ── Internal ──────────────────────────────────────────────────────────────
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:country_picker/country_picker.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
 
 import 'models/country_model.dart';
 import 'utils/phone_formatter.dart';
@@ -26,7 +22,6 @@ import 'utils/phone_formatter.dart';
 
 /// A smart phone-number input field with:
 ///
-/// * Automatic country detection from device locale / GPS (optional).
 /// * Per-country number formatting applied as the user types.
 /// * Searchable country picker (bottom sheet).
 /// * Full design customisation via individual properties.
@@ -55,7 +50,6 @@ class SmartPhoneField extends StatefulWidget {
   final TextEditingController? controller;
 
   /// ISO 3166-1 alpha-2 code to pre-select a country (e.g. `'BD'`, `'US'`).
-  /// Takes priority over [autoDetectCountry].
   final String? initialCountryCode;
 
   /// Called whenever the phone number or country changes.
@@ -70,10 +64,6 @@ class SmartPhoneField extends StatefulWidget {
   final void Function(String value)? onSubmitted;
 
   // ── Behaviour ─────────────────────────────────────────────────────────────
-
-  /// Whether to attempt GPS-based country detection on first load.
-  /// Ignored if [initialCountryCode] is set.
-  final bool autoDetectCountry;
 
   /// Makes the text field non-editable.
   final bool readOnly;
@@ -115,6 +105,9 @@ class SmartPhoneField extends StatefulWidget {
 
   /// Hint text shown in the country search field.
   final String searchHintText;
+
+  /// Border radius of the search field in the country picker.
+  final double searchFieldBorderRadius;
 
   /// Theme passed directly to [showCountryPicker]. Use this to fully
   /// customise the bottom sheet appearance.
@@ -206,7 +199,6 @@ class SmartPhoneField extends StatefulWidget {
     this.onError,
     this.onSubmitted,
     // behaviour
-    this.autoDetectCountry = true,
     this.readOnly = false,
     this.enabled = true,
     this.autofocus = false,
@@ -220,8 +212,9 @@ class SmartPhoneField extends StatefulWidget {
     this.flagSize = 22,
     this.showDropdownIcon = true,
     this.countryButtonPadding =
-        const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        const EdgeInsets.only(left: 12, right: 8, top: 10, bottom: 10),
     this.searchHintText = 'Search country…',
+    this.searchFieldBorderRadius = 12.0,
     this.countryPickerTheme,
     // container
     this.borderRadius,
@@ -238,7 +231,7 @@ class SmartPhoneField extends StatefulWidget {
     this.hintStyle,
     this.labelStyle,
     this.contentPadding =
-        const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
     this.suffixIcon,
     this.decoration,
     // error
@@ -268,8 +261,7 @@ class _SmartPhoneFieldState extends State<SmartPhoneField> {
   String? _errorText;
 
   bool _isBusy = false; // guard against re-entrant formatting
-  bool _isDetecting = false;
-  bool _locationDenied = false;
+
   bool _hasFocus = false;
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -289,14 +281,52 @@ class _SmartPhoneFieldState extends State<SmartPhoneField> {
   void _initialise() {
     if (widget.initialCountryCode != null) {
       _country = CountryModel.getByCode(widget.initialCountryCode!);
-    } else if (widget.autoDetectCountry) {
-      _detectCountryFromGps();
     } else {
-      // Fall back to device locale
-      final locale = WidgetsBinding.instance.platformDispatcher.locale;
-      final code = locale.countryCode;
+      // Use device locale by default
+      final platformDispatcher = WidgetsBinding.instance.platformDispatcher;
+      final locales = platformDispatcher.locales;
+      String? code;
+
+      // 1. Try to find the first non-null country code in the system's locale list
+      for (final locale in locales) {
+        if (locale.countryCode != null && locale.countryCode!.isNotEmpty) {
+          // If we find 'BD' anywhere in the list, prioritize it
+          if (locale.countryCode == 'BD') {
+            code = 'BD';
+            break;
+          }
+          code ??= locale.countryCode;
+        }
+      }
+
+      // 2. If still no code, try parsing the full locale string (e.g. "en_BD")
+      if (code == null || code.isEmpty) {
+        for (final locale in locales) {
+          final locString = locale.toString();
+          if (locString.contains('_')) {
+            final parts = locString.split('_');
+            if (parts.length > 1 && parts.last.length == 2) {
+              code = parts.last;
+              break;
+            }
+          }
+        }
+      }
+
+      // 3. Last resort fallback for Bangladesh specifically based on Timezone (UTC+6)
+      if (code == null || code == 'US' || code == 'GB') {
+        final offset = DateTime.now().timeZoneOffset.inHours;
+        if (offset == 6) {
+          code = 'BD';
+        }
+      }
+
       if (code != null && code.isNotEmpty) {
-        _country = CountryModel.getByCode(code);
+        try {
+          _country = CountryModel.getByCode(code);
+        } catch (_) {
+          _country = CountryModel.getByCode('US');
+        }
       }
     }
 
@@ -328,61 +358,6 @@ class _SmartPhoneFieldState extends State<SmartPhoneField> {
     if (widget.controller == null) _controller.dispose();
     if (widget.focusNode == null) _focusNode.dispose();
     super.dispose();
-  }
-
-  // ── Location detection ────────────────────────────────────────────────────
-
-  Future<void> _detectCountryFromGps() async {
-    if (!mounted) return;
-    setState(() {
-      _isDetecting = true;
-      _locationDenied = false;
-    });
-
-    try {
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        _fallbackToLocale();
-        return;
-      }
-
-      final pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.low,
-      ).timeout(const Duration(seconds: 8));
-
-      final marks = await placemarkFromCoordinates(
-        pos.latitude,
-        pos.longitude,
-      );
-
-      if (marks.isNotEmpty && mounted) {
-        final code = marks.first.isoCountryCode ?? 'US';
-        setState(() => _country = CountryModel.getByCode(code));
-      }
-    } on TimeoutException {
-      _fallbackToLocale();
-    } catch (_) {
-      _fallbackToLocale();
-    } finally {
-      if (mounted) setState(() => _isDetecting = false);
-    }
-  }
-
-  void _fallbackToLocale() {
-    if (!mounted) return;
-    final locale = WidgetsBinding.instance.platformDispatcher.locale;
-    final code = locale.countryCode;
-    setState(() {
-      _locationDenied = true;
-      if (code != null && code.isNotEmpty) {
-        _country = CountryModel.getByCode(code);
-      }
-    });
   }
 
   // ── Text change & formatting ──────────────────────────────────────────────
@@ -443,20 +418,72 @@ class _SmartPhoneFieldState extends State<SmartPhoneField> {
   void _openCountryPicker() {
     showCountryPicker(
       context: context,
-      showPhoneCode: true,
       countryListTheme: widget.countryPickerTheme ??
           CountryListThemeData(
             borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(20),
+              top: Radius.circular(24),
             ),
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            searchTextStyle: Theme.of(context).textTheme.bodyMedium,
             inputDecoration: InputDecoration(
               hintText: widget.searchHintText,
-              prefixIcon: const Icon(Icons.search_rounded),
+              prefixIcon: const Icon(Icons.search_rounded, size: 20),
+              filled: true,
+              fillColor: Theme.of(context)
+                  .colorScheme
+                  .surfaceContainerHighest
+                  .withValues(alpha: 0.4),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(30),
+                borderRadius:
+                    BorderRadius.circular(widget.searchFieldBorderRadius),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius:
+                    BorderRadius.circular(widget.searchFieldBorderRadius),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius:
+                    BorderRadius.circular(widget.searchFieldBorderRadius),
+                borderSide: BorderSide(
+                  color: Theme.of(context).colorScheme.primary,
+                  width: 1.5,
+                ),
               ),
             ),
           ),
+      showPhoneCode: false,
+      customFlagBuilder: (Country c) {
+        final flag = c.iswWorldWide ? '\uD83C\uDF0D' : c.flagEmoji;
+        final bool isRtl = Directionality.of(context) == TextDirection.rtl;
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: isRtl ? 50 : null,
+              child: Text(
+                flag,
+                style: TextStyle(
+                  fontSize: widget.countryPickerTheme?.flagSize ?? 25,
+                ),
+              ),
+            ),
+            if (!c.iswWorldWide) ...[
+              const SizedBox(width: 15),
+              Text(
+                '${isRtl ? '' : '+'}${c.phoneCode}${isRtl ? '+' : ''}',
+                style: widget.countryPickerTheme?.textStyle ??
+                    const TextStyle(fontSize: 16),
+              ),
+              const SizedBox(width: 15),
+            ] else
+              const SizedBox(width: 15),
+          ],
+        );
+      },
       onSelect: (Country c) {
         setState(() {
           _country = CountryModel.getByCode(c.countryCode);
@@ -484,8 +511,8 @@ class _SmartPhoneFieldState extends State<SmartPhoneField> {
     if (hasError) {
       border = widget.errorBorderColor ?? Colors.red.shade400;
     } else if (_hasFocus) {
-      border = widget.focusedBorderColor ??
-          Theme.of(context).colorScheme.primary;
+      border =
+          widget.focusedBorderColor ?? Theme.of(context).colorScheme.primary;
     } else {
       border = widget.borderColor ?? Colors.grey.shade400;
     }
@@ -494,8 +521,19 @@ class _SmartPhoneFieldState extends State<SmartPhoneField> {
       borderRadius: radius,
       color: widget.filled
           ? (widget.fillColor ?? Theme.of(context).cardColor)
-          : null,
-      border: Border.all(color: border, width: widget.borderWidth),
+          : Theme.of(context).colorScheme.surface,
+      border: Border.all(
+        color: border,
+        width: _hasFocus ? (widget.borderWidth + 0.5) : widget.borderWidth,
+      ),
+      boxShadow: [
+        if (_hasFocus)
+          BoxShadow(
+            color: border.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+      ],
     );
   }
 
@@ -520,69 +558,74 @@ class _SmartPhoneFieldState extends State<SmartPhoneField> {
 
         // ── Outer container ────────────────────────────────────────────────
         AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
           decoration: _buildContainerDecoration(),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Country selector
-              _CountryButton(
-                country: _country,
-                isDetecting: _isDetecting,
-                flagSize: widget.flagSize,
-                dialCodeStyle: widget.dialCodeStyle,
-                showDropdown: widget.showDropdownIcon,
-                padding: widget.countryButtonPadding,
-                onTap: widget.enabled && !widget.readOnly
-                    ? _openCountryPicker
-                    : null,
-              ),
-
-              // Vertical divider
-              Container(
-                height: 24,
-                width: 1,
-                color: Colors.grey.shade300,
-              ),
-
-              // Phone input
-              Expanded(
-                child: TextField(
-                  controller: _controller,
-                  focusNode: _focusNode,
-                  readOnly: widget.readOnly,
-                  enabled: widget.enabled,
-                  autofocus: widget.autofocus,
-                  keyboardType: TextInputType.phone,
-                  textInputAction: widget.textInputAction,
-                  inputFormatters: widget.inputFormatters,
-                  style: widget.textStyle ??
-                      Theme.of(context).textTheme.bodyMedium,
-                  cursorColor:
-                      widget.cursorColor ?? Theme.of(context).colorScheme.primary,
-                  onTap: widget.onTap,
-                  onEditingComplete: widget.onEditingComplete,
-                  onSubmitted: widget.onSubmitted,
-                  decoration: _buildInputDecoration(),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Country selector
+                _CountryButton(
+                  country: _country,
+                  flagSize: widget.flagSize,
+                  dialCodeStyle: widget.dialCodeStyle,
+                  showDropdown: widget.showDropdownIcon,
+                  padding: widget.countryButtonPadding,
+                  onTap: widget.enabled && !widget.readOnly
+                      ? _openCountryPicker
+                      : null,
                 ),
-              ),
 
-              // Optional suffix
-              if (widget.suffixIcon != null)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: widget.suffixIcon!,
+                // Vertical divider
+                VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  indent: 10,
+                  endIndent: 10,
+                  color: Colors.grey.shade300,
                 ),
-            ],
+
+                // Phone input
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    focusNode: _focusNode,
+                    readOnly: widget.readOnly,
+                    enabled: widget.enabled,
+                    autofocus: widget.autofocus,
+                    keyboardType: TextInputType.phone,
+                    textInputAction: widget.textInputAction,
+                    inputFormatters: widget.inputFormatters,
+                    style: widget.textStyle ??
+                        Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w500,
+                            ),
+                    cursorColor: widget.cursorColor ??
+                        Theme.of(context).colorScheme.primary,
+                    cursorWidth: 2,
+                    cursorRadius: const Radius.circular(2),
+                    onTap: widget.onTap,
+                    onEditingComplete: widget.onEditingComplete,
+                    onSubmitted: widget.onSubmitted,
+                    decoration: _buildInputDecoration(),
+                  ),
+                ),
+
+                // Optional suffix
+                if (widget.suffixIcon != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 0),
+                    child: widget.suffixIcon!,
+                  ),
+              ],
+            ),
           ),
         ),
 
         // ── Status messages ────────────────────────────────────────────────
         if (widget.showError && _errorText != null)
           _buildErrorWidget(_errorText!),
-
-        if (_locationDenied && widget.autoDetectCountry)
-          _buildLocationDeniedBanner(),
       ],
     );
   }
@@ -638,24 +681,6 @@ class _SmartPhoneFieldState extends State<SmartPhoneField> {
       ),
     );
   }
-
-  Widget _buildLocationDeniedBanner() {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, top: 4),
-      child: Row(
-        children: [
-          Icon(Icons.location_off_rounded, size: 12, color: Colors.orange[600]),
-          const SizedBox(width: 4),
-          Expanded(
-            child: Text(
-              'Location access denied — using device locale.',
-              style: TextStyle(fontSize: 11, color: Colors.orange[600]),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -665,7 +690,6 @@ class _SmartPhoneFieldState extends State<SmartPhoneField> {
 class _CountryButton extends StatelessWidget {
   const _CountryButton({
     required this.country,
-    required this.isDetecting,
     required this.flagSize,
     required this.showDropdown,
     required this.padding,
@@ -674,7 +698,6 @@ class _CountryButton extends StatelessWidget {
   });
 
   final CountryModel country;
-  final bool isDetecting;
   final double flagSize;
   final bool showDropdown;
   final EdgeInsetsGeometry padding;
@@ -691,32 +714,26 @@ class _CountryButton extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Flag or loader
+            // Flag emoji
             SizedBox(
               width: flagSize + 2,
-              child: isDetecting
-                  ? SizedBox(
-                      width: flagSize - 4,
-                      height: flagSize - 4,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    )
-                  : Text(
-                      country.flag,
-                      style: TextStyle(fontSize: flagSize),
-                    ),
+              child: Text(
+                country.flag,
+                style: TextStyle(fontSize: flagSize),
+              ),
             ),
             const SizedBox(width: 6),
 
             // Dial code
             Text(
               country.dialCode,
+              maxLines: 1,
+              softWrap: false,
               style: dialCodeStyle ??
                   Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.3,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.2,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
             ),
 
@@ -724,7 +741,7 @@ class _CountryButton extends StatelessWidget {
               const SizedBox(width: 2),
               Icon(
                 Icons.arrow_drop_down_rounded,
-                size: 18,
+                size: 25,
                 color: Colors.grey.shade500,
               ),
             ],

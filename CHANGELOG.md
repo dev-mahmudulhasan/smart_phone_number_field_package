@@ -1,3 +1,32 @@
+## 2.1.2 — 2026-03-31
+
+### ✨ New Features
+* **Enhanced Country Picker UI** — Modern, professional search field styling out-of-the-box.
+* **`searchFieldBorderRadius`** — Customise search field corner radius (defaults to `12.0`).
+
+### 🛠 Improvements
+* Improved default bottom-sheet design with cleaner focus states and system-aware colors.
+* Fixed an issue where 4-digit country dial codes would wrap onto a second line in the country picker bottom sheet.
+* Improved default spacing for the country code field: centered the vertical divider with identical gaps, and increased the dropdown arrow size to `25`.
+
+---
+
+## 2.1.1 — 2026-03-31
+
+* Initialised version 2.1.1 (manual bump).
+
+---
+
+## 2.1.0 — 2026-03-31
+
+### 🛠 Improvements
+* **Removed location dependencies** (`geolocator`, `geocoding`) to resolve version conflicts.
+* **Simplified country detection** — now uses device locale as the only fallback if `initialCountryCode` is not provided.
+* **Removed `autoDetectCountry`** parameter (no longer needed).
+* Updated example app and documentation.
+
+---
+
 ## 2.0.0 — 2026-03-31
 
 ### 🚀 Breaking Changes

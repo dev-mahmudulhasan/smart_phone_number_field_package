@@ -2,7 +2,6 @@
 
 A smart, professional Flutter phone-number input field with:
 
-- 🌍 **Auto country detection** — GPS-based on first load *(optional)*
 - 🏳️ **180+ countries** pre-configured with correct national spacing/dash patterns
 - ⌨️ **Live formatting** as the user types — `1758 691303`, `(212) 555 1234`, etc.
 - ✅ **Built-in validation** with customisable error display
@@ -14,10 +13,8 @@ A smart, professional Flutter phone-number input field with:
 
 ```yaml
 dependencies:
-  smart_phone_field: ^2.0.0
+  smart_phone_field: ^2.1.2
 ```
-
-Then add location permissions to your platform manifests if you enable `autoDetectCountry`.
 
 ---
 
@@ -51,7 +48,7 @@ SmartPhoneField(
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `autoDetectCountry` | `bool` | `true` | GPS-based country detect |
+
 | `readOnly` | `bool` | `false` | Non-editable mode |
 | `enabled` | `bool` | `true` | Enable / disable widget |
 | `autofocus` | `bool` | `false` | Auto-focus on build |
@@ -93,6 +90,7 @@ SmartPhoneField(
 | `showDropdownIcon` | `bool` | `true` | Show chevron arrow |
 | `countryButtonPadding` | `EdgeInsets` | `h:12 v:14` | Selector padding |
 | `searchHintText` | `String` | `'Search country…'` | Search field hint |
+| `searchFieldBorderRadius` | `double` | `12.0` | Search field corner radius |
 | `countryPickerTheme` | `CountryListThemeData?` | `null` | Bottom-sheet theme |
 
 ### Error Display
@@ -111,7 +109,6 @@ SmartPhoneField(
 ```dart
 SmartPhoneField(
   initialCountryCode: 'BD',
-  autoDetectCountry: false,
   hintText: '1758 691303',
   labelText: 'Mobile Number',
 )
