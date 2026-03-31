@@ -1,0 +1,22 @@
+name: smart_phone_field
+version: 1.0.0
+description: A smart phone number input field with auto formatting, country selection, and automatic location detection.
+repository: https://github.com/mdmahmudulhasan/smart_phone_field
+issue_tracker: https://github.com/mdmahmudulhasan/smart_phone_field/issues
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  country_picker: ^2.0.20
+  geolocator: ^10.1.0
+  geocoding: ^2.1.1
+  phone_numbers_parser: ^9.0.20
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
