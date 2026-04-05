@@ -53,9 +53,18 @@ class SmartPhoneField extends StatefulWidget {
   final String? initialCountryCode;
 
   /// Called whenever the phone number or country changes.
-  /// [nationalDigits] contains only the digits the user typed (no separators).
+  /// [dialCode] is the country dial code (e.g. `+880`).
+  /// [phoneNumber] contains only the digits the user typed (no separators).
   /// [isoCode] is the ISO alpha-2 country code.
-  final void Function(String nationalDigits, String isoCode)? onChanged;
+  final void Function(String dialCode, String phoneNumber, String isoCode)?
+      onChanged;
+
+  /// Custom validator. Return an error string or `null` if valid.
+  final String? Function(String dialCode, String phoneNumber)? validator;
+
+  /// Whether the field is required. If true and no [validator] is provided,
+  /// a default "Required" error will be shown when empty.
+  final bool isRequired;
 
   /// Called with a validation error string, or `null` when valid.
   final void Function(String? error)? onError;
@@ -196,6 +205,8 @@ class SmartPhoneField extends StatefulWidget {
     this.controller,
     this.initialCountryCode,
     this.onChanged,
+    this.validator,
+    this.isRequired = false,
     this.onError,
     this.onSubmitted,
     // behaviour
@@ -245,14 +256,14 @@ class SmartPhoneField extends StatefulWidget {
   });
 
   @override
-  State<SmartPhoneField> createState() => _SmartPhoneFieldState();
+  State<SmartPhoneField> createState() => SmartPhoneFieldState();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // State
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _SmartPhoneFieldState extends State<SmartPhoneField> {
+class SmartPhoneFieldState extends State<SmartPhoneField> {
   late TextEditingController _controller;
   late FocusNode _focusNode;
 
@@ -370,14 +381,8 @@ class _SmartPhoneFieldState extends State<SmartPhoneField> {
     if (newDigits != _rawDigits) {
       _rawDigits = newDigits;
       _applyFormat();
-
-      final err = PhoneFormatter.validate(_rawDigits, _country);
-      if (err != _errorText) {
-        setState(() => _errorText = err);
-        widget.onError?.call(err);
-      }
-
-      widget.onChanged?.call(_rawDigits, _country.code);
+      _validate();
+      widget.onChanged?.call(_country.dialCode, _rawDigits, _country.code);
     }
 
     _isBusy = false;
@@ -405,12 +410,38 @@ class _SmartPhoneFieldState extends State<SmartPhoneField> {
   void _onFocusChanged() {
     setState(() => _hasFocus = _focusNode.hasFocus);
     if (!_focusNode.hasFocus) {
-      final err = PhoneFormatter.validate(_rawDigits, _country);
-      if (err != _errorText) {
-        setState(() => _errorText = err);
-        widget.onError?.call(err);
-      }
+      _validate();
     }
+  }
+
+  /// Manually trigger validation. Returns true if valid.
+  bool validateField() {
+    return _validate();
+  }
+
+  bool _validate() {
+    String? err;
+
+    // 1. Check custom validator first
+    if (widget.validator != null) {
+      err = widget.validator!(_country.dialCode, _rawDigits);
+    }
+
+    // 2. Default required check
+    if (err == null && widget.isRequired && _rawDigits.isEmpty) {
+      err = 'This field is required';
+    }
+
+    // 3. Built-in format validation
+    if (err == null && _rawDigits.isNotEmpty) {
+      err = PhoneFormatter.validate(_rawDigits, _country);
+    }
+
+    if (err != _errorText) {
+      setState(() => _errorText = err);
+      widget.onError?.call(err);
+    }
+    return err == null;
   }
 
   // ── Country picker ────────────────────────────────────────────────────────
@@ -492,7 +523,7 @@ class _SmartPhoneFieldState extends State<SmartPhoneField> {
           _clearController();
         });
         widget.onError?.call(null);
-        widget.onChanged?.call('', _country.code);
+        widget.onChanged?.call(_country.dialCode, '', _country.code);
       },
     );
   }

@@ -1,3 +1,16 @@
+## 2.2.0 — 2026-04-05
+
+### ✨ New Features
+* **Triple Parameter `onChanged`** — Callback now provides `(dialCode, phoneNumber, isoCode)` for simpler integration.
+* **`validator`** — Custom validation support through a standard callback.
+* **`isRequired`** — New boolean property for quick mandatory field validation.
+
+### 🛠 Improvements
+* **Manual Validation** — Expose a dynamic `validateField()` method in `SmartPhoneFieldState` to allow validation via `GlobalKey<SmartPhoneFieldState>`.
+* **Public State** — Renamed `_SmartPhoneFieldState` to `SmartPhoneFieldState` to ensure full compatibility with `GlobalKey` and platform-specific access.
+
+---
+
 ## 2.1.2 — 2026-03-31
 
 ### ✨ New Features

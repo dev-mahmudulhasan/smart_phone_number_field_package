@@ -64,7 +64,7 @@ class _DemoPageState extends State<DemoPage> {
             const _SectionTitle('Default (device locale)'),
             SmartPhoneField(
               controller: _controller1,
-              onChanged: (digits, iso) => setState(() {
+              onChanged: (dialCode, digits, iso) => setState(() {
                 _nationalDigits = digits;
                 _isoCode = iso;
               }),
@@ -157,7 +157,10 @@ class _DemoPageState extends State<DemoPage> {
               ),
             ),
 
-            const SizedBox(height: 40),
+            const SizedBox(height: 32),
+            // ── Validation demo ──────────────────────────────────────────
+            const _SectionTitle('Required + Custom Validator'),
+            _ValidationDemo(),
           ],
         ),
       ),
@@ -238,7 +241,9 @@ class _Row extends StatelessWidget {
         children: [
           SizedBox(
             width: 110,
-            child: Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w600)),
+            child: Text(label,
+                style: const TextStyle(
+                    fontSize: 12, color: Colors.grey, fontWeight: FontWeight.w600)),
           ),
           Expanded(
             child: Text(
@@ -252,6 +257,48 @@ class _Row extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _ValidationDemo extends StatefulWidget {
+  @override
+  State<_ValidationDemo> createState() => _ValidationDemoState();
+}
+
+class _ValidationDemoState extends State<_ValidationDemo> {
+  final _fieldKey = GlobalKey<SmartPhoneFieldState>();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        SmartPhoneField(
+          key: _fieldKey,
+          isRequired: true,
+          labelText: 'Validation Example',
+          validator: (dialCode, digits) {
+            if (digits.startsWith('0')) {
+              return 'Number should not start with 0';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 12),
+        ElevatedButton.icon(
+          onPressed: () {
+            final isValid = _fieldKey.currentState?.validateField() ?? false;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(isValid ? 'Form is valid!' : 'Form has errors!'),
+                backgroundColor: isValid ? Colors.green : Colors.red,
+              ),
+            );
+          },
+          icon: const Icon(Icons.check_circle_outline),
+          label: const Text('Validate Manually'),
+        ),
+      ],
     );
   }
 }
