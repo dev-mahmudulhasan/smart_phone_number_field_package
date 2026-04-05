@@ -1,9 +1,16 @@
+## 2.2.1 — 2026-04-05
+
+### ✨ New Features
+* **Visual Required Indicator** — Mandatory fields (where `isRequired` is true) now automatically display a red `*` next to the label.
+
+---
+
 ## 2.2.0 — 2026-04-05
 
 ### ✨ New Features
 * **Triple Parameter `onChanged`** — Callback now provides `(dialCode, phoneNumber, isoCode)` for simpler integration.
 * **`validator`** — Custom validation support through a standard callback.
-* **`isRequired`** — New boolean property for quick mandatory field validation (now includes a visual red `*` next to the label).
+* **`isRequired`** — New boolean property for quick mandatory field validation.
 
 ### 🛠 Improvements
 * **Manual Validation** — Expose a dynamic `validateField()` method in `SmartPhoneFieldState` to allow validation via `GlobalKey<SmartPhoneFieldState>`.
