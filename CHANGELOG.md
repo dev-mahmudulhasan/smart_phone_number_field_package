@@ -3,7 +3,7 @@
 ### ✨ New Features
 * **Triple Parameter `onChanged`** — Callback now provides `(dialCode, phoneNumber, isoCode)` for simpler integration.
 * **`validator`** — Custom validation support through a standard callback.
-* **`isRequired`** — New boolean property for quick mandatory field validation.
+* **`isRequired`** — New boolean property for quick mandatory field validation (now includes a visual red `*` next to the label).
 
 ### 🛠 Improvements
 * **Manual Validation** — Expose a dynamic `validateField()` method in `SmartPhoneFieldState` to allow validation via `GlobalKey<SmartPhoneFieldState>`.

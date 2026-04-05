@@ -577,8 +577,20 @@ class SmartPhoneFieldState extends State<SmartPhoneField> {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (widget.labelText != null) ...[
-          Text(
-            widget.labelText!,
+          Text.rich(
+            TextSpan(
+              text: widget.labelText!,
+              children: [
+                if (widget.isRequired)
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(
+                      color: Colors.red.shade600,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+              ],
+            ),
             style: widget.labelStyle ??
                 Theme.of(context).textTheme.labelMedium?.copyWith(
                       fontWeight: FontWeight.w600,
